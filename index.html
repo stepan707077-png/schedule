@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Расписание</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--bg1:#1d2b4a;--bg2:#0b1020;--card:rgba(20,28,50,.82);--line:#2a3556;--fld:#1b2440;--fld-l:#2f3b63;--tx:#eef2ff;--mut:#9fb0d8;--ac:#4a8fe7;--star:#ffb020}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{background:var(--bg2)}
+body{margin:0;min-height:100vh;background:radial-gradient(circle at 20% 0,var(--bg1),var(--bg2) 60%) fixed;color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.w{max-width:560px;margin:0 auto;padding:16px}
+h1{margin:4px 0 14px;font-size:22px;text-align:center}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;margin-bottom:14px}
+.card.today{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac) inset}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row{display:flex;gap:10px;align-items:center;margin:12px 0 0}
+.row.c{justify-content:center}
+button,select,input{font:inherit;color:var(--tx);background:var(--fld);border:1px solid var(--fld-l);border-radius:12px;padding:11px;min-width:0}
+button{cursor:pointer}
+button.b{background:var(--ac);border-color:var(--ac);font-weight:700}
+button.b:active{opacity:.8}
+select{flex:1}
+input[type=date]{flex:1;color-scheme:dark}
+#star{font-size:22px;line-height:1;padding:8px 10px;background:none;border:0;color:var(--mut)}
+#star.on{color:var(--star)}
+label{color:var(--mut);font-weight:600}
+.lbl{text-align:center;margin-bottom:8px}
+.d{font-weight:700;font-size:18px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.d small{color:var(--mut);font-weight:400;font-size:14px}
+.badge{font-size:12px;font-weight:700;background:var(--ac);border-radius:8px;padding:2px 8px;margin-left:8px}
+.p{display:flex;gap:12px;padding:10px 0;border-top:1px solid var(--line);margin-top:10px}
+.p+.p{margin-top:0}
+.n{color:var(--ac);font-weight:800;width:18px;flex:none}
+.s{font-weight:600}
+.i{color:var(--mut);font-size:14px}
+.e{color:var(--mut);padding:8px 0 0}
+</style></head><body><div class="w">
+<h1>Расписание</h1>
+<div class="card">
+  <div class="lbl"><label for="g">Группа</label></div>
+  <div class="row" style="margin-top:0"><select id="g"></select><button id="star" title="В избранное" aria-label="В избранное">☆</button></div>
+  <div class="grid" style="margin-top:14px">
+    <button class="b" data-k="0">Сегодня</button><button class="b" data-k="1">Завтра</button>
+    <button class="b" data-k="2">Послезавтра</button><button class="b" data-k="w">Неделя</button>
+  </div>
+  <div class="row"><label for="a" style="width:28px">С</label><input type="date" id="a"><label for="z" style="width:28px;text-align:right">По</label><input type="date" id="z"></div>
+  <div class="row c"><button class="b" id="go" style="width:100%">Показать период</button></div>
+</div>
+<div id="out"></div>
+</div>
+<script>
+const tg=window.Telegram&&Telegram.WebApp;
+if(tg){tg.ready();tg.expand();try{tg.setHeaderColor("#0b1020");tg.setBackgroundColor("#0b1020")}catch(e){}}
+const $=i=>document.getElementById(i);
+const MON=["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+const FULL=["Понедельник","Вторник","Среда","Четверг","Пятница","Суббота"],SH=["Пн","Вт","Ср","Чт","Пт","Сб"];
+let DATA={weeks:{}},fav="";
+
+const cloud=tg&&tg.CloudStorage&&tg.isVersionAtLeast&&tg.isVersionAtLeast("6.9");
+const st={
+  get(k,cb){if(cloud)tg.CloudStorage.getItem(k,(e,v)=>cb(e?"":v||""));else{let v="";try{v=localStorage.getItem(k)||""}catch(e){}cb(v)}},
+  set(k,v){if(cloud)tg.CloudStorage.setItem(k,v);else try{localStorage.setItem(k,v)}catch(e){}}
+};
+
+const iso=d=>new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const plus=n=>{const d=new Date();d.setDate(d.getDate()+n);return iso(d)};
+const dow=d=>(d.getDay()+6)%7;
+function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!==undefined)e.textContent=x;return e}
+
+function mondayIso(d){const m=new Date(d);m.setDate(m.getDate()-dow(m));return iso(m)}
+function lessons(g,d){
+  const w=DATA.weeks[mondayIso(d)];
+  return w?((w.groups[g]||{})[SH[dow(d)]]||[]):null;
+}
+function star(){const on=$("g").value&&$("g").value==fav;$("star").className=on?"on":"";$("star").textContent=on?"★":"☆"}
+
+function show(){
+  const g=$("g").value,o=$("out");
+  if(g)st.set("grp",g);
+  star();o.replaceChildren();
+  let d=new Date($("a").value+"T00:00:00");const b=new Date($("z").value+"T00:00:00");
+  if(!(b>=d)||(b-d)/864e5>31){o.append(el("div","card e","Проверь даты (максимум 31 день)"));return}
+  const today=plus(0);let any=false,todayCard=null;
+  for(;d<=b;d.setDate(d.getDate()+1)){
+    const k=dow(d);if(k>5)continue;any=true;
+    const c=el("div","card"),h=el("div","d"),t=el("span","",d.getDate()+" "+MON[d.getMonth()]);
+    if(iso(d)==today){c.classList.add("today");t.append(el("span","badge","сегодня"));todayCard=c}
+    h.append(t,el("small","",FULL[k]));c.append(h);
+    const L=lessons(g,d);
+    if(L===null)c.append(el("div","e","Расписание на эту неделю ещё не загружено"));
+    else if(!L.length)c.append(el("div","e","Пар нет"));
+    else for(const l of L){
+      const p=el("div","p"),bx=el("div");
+      bx.append(el("div","s",l.s),el("div","i",[l.t,l.r&&"каб. "+l.r].filter(Boolean).join(" · ")));
+      p.append(el("div","n",l.p),bx);c.append(p);
+    }
+    o.append(c);
+  }
+  if(!any)o.append(el("div","card e","В этом периоде только воскресенья: выходной"));
+}
+
+function setRange(k){
+  if(k=="w"){
+    const n=new Date(),s=dow(n)==6?1:-dow(n);   // в воскресенье показываем следующую неделю
+    $("a").value=plus(s);$("z").value=plus(s+5);
+  }else{$("a").value=plus(+k);$("z").value=plus(+k)}
+  show();
+}
+document.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>setRange(b.dataset.k));
+$("go").onclick=show;
+$("g").onchange=show;
+$("star").onclick=()=>{fav=$("g").value==fav?"":$("g").value;st.set("fav",fav);star()};
+
+fetch("data.json",{cache:"no-cache"}).then(r=>{if(!r.ok)throw 0;return r.json()}).then(j=>{
+  DATA=j;
+  const gs=[...new Set(Object.values(j.weeks).flatMap(w=>Object.keys(w.groups)))].sort();
+  if(!gs.length){$("out").append(el("div","card e","Данные пока не загружены"));return}
+  gs.forEach(x=>$("g").append(el("option","",x)));
+  st.get("fav",f=>{fav=f;st.get("grp",l=>{
+    const s=f||l;if(s&&gs.includes(s))$("g").value=s;
+    $("a").value=plus(0);$("z").value=plus(0);show();
+  })});
+}).catch(()=>$("out").append(el("div","card e","Не удалось загрузить расписание")));
+</script></body></html>
