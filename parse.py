@@ -32,6 +32,7 @@ def parse(path, year):
                 g = " ".join(pg.crop((x0+1, hs[0], x1-1, hs[1])).extract_text().split())
                 days = {}
                 for i, (y0, y1) in enumerate(rows[:30]):
+                    if i == 29: continue  # 5-я пара субботы: там только вертикальная надпись "Расписание"
                     c = cell(pg.crop((x0+1, y0+1, x1-1, y1-1)))
                     if c:
                         c["p"] = i % 5 + 1; days.setdefault(DAYS[i//5], []).append(c)

@@ -20,7 +20,9 @@ button{cursor:pointer}
 button.b{background:var(--ac);border-color:var(--ac);font-weight:700}
 button.b:active{opacity:.8}
 select{flex:1}
-input[type=date]{flex:1;color-scheme:dark}
+input[type=date]{width:100%;min-width:0;max-width:100%;color-scheme:dark}
+.dates{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.dates label{display:flex;flex-direction:column;gap:4px;min-width:0}
 #star{font-size:22px;line-height:1;padding:8px 10px;background:none;border:0;color:var(--mut)}
 #star.on{color:var(--star)}
 label{color:var(--mut);font-weight:600}
@@ -30,7 +32,8 @@ label{color:var(--mut);font-weight:600}
 .badge{font-size:12px;font-weight:700;background:var(--ac);border-radius:8px;padding:2px 8px;margin-left:8px}
 .p{display:flex;gap:12px;padding:10px 0;border-top:1px solid var(--line);margin-top:10px}
 .p+.p{margin-top:0}
-.n{color:var(--ac);font-weight:800;width:18px;flex:none}
+.n{color:var(--ac);font-weight:800;width:46px;flex:none;text-align:center}
+.n small{display:block;font-weight:400;font-size:12px;line-height:1.25;color:var(--mut)}
 .s{font-weight:600}
 .i{color:var(--mut);font-size:14px}
 .e{color:var(--mut);padding:8px 0 0}
@@ -43,7 +46,7 @@ label{color:var(--mut);font-weight:600}
     <button class="b" data-k="0">Сегодня</button><button class="b" data-k="1">Завтра</button>
     <button class="b" data-k="2">Послезавтра</button><button class="b" data-k="w">Неделя</button>
   </div>
-  <div class="row"><label for="a" style="width:28px">С</label><input type="date" id="a"><label for="z" style="width:28px;text-align:right">По</label><input type="date" id="z"></div>
+  <div class="dates"><label>С<input type="date" id="a"></label><label>По<input type="date" id="z"></label></div>
   <div class="row c"><button class="b" id="go" style="width:100%">Показать период</button></div>
 </div>
 <div id="out"></div>
@@ -68,9 +71,14 @@ const dow=d=>(d.getDay()+6)%7;
 function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!==undefined)e.textContent=x;return e}
 
 function mondayIso(d){const m=new Date(d);m.setDate(m.getDate()-dow(m));return iso(m)}
+// расписание звонков: пн-пт и суббота
+const T1=[["08:30","10:05"],["10:15","11:50"],["12:30","14:05"],["14:15","15:50"],["16:00","17:35"]];
+const T6=[["08:30","09:50"],["10:00","11:20"],["11:40","13:00"],["13:10","14:30"]];
 function lessons(g,d){
   const w=DATA.weeks[mondayIso(d)];
-  return w?((w.groups[g]||{})[SH[dow(d)]]||[]):null;
+  if(!w)return null;
+  const L=(w.groups[g]||{})[SH[dow(d)]]||[];
+  return dow(d)==5?L.filter(l=>l.p<=4):L;   // в субботу только 4 пары
 }
 function star(){const on=$("g").value&&$("g").value==fav;$("star").className=on?"on":"";$("star").textContent=on?"★":"☆"}
 
@@ -92,7 +100,10 @@ function show(){
     else for(const l of L){
       const p=el("div","p"),bx=el("div");
       bx.append(el("div","s",l.s),el("div","i",[l.t,l.r&&"каб. "+l.r].filter(Boolean).join(" · ")));
-      p.append(el("div","n",l.p),bx);c.append(p);
+      const n=el("div","n"),tm=(k==5?T6:T1)[l.p-1];
+      n.append(el("div","",l.p));
+      if(tm)n.append(el("small","",tm[0]),el("small","",tm[1]));
+      p.append(n,bx);c.append(p);
     }
     o.append(c);
   }
