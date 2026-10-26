@@ -18,6 +18,14 @@ def cell(box):
     if m: t, r = ttxt[:m.end()].strip(), ttxt[m.end():].strip()
     elif ttxt: t, _, r = ttxt.rpartition(" ")
     return {"s": s, "t": t, "r": r} if s or t else None
+def merge_practice(ls):
+    """Практика в PDF - одна ячейка на 3 пары: препод. в 1-й строке, название в другой. Склеиваем."""
+    t = next((x for x in ls if not x["s"] and x["t"]), None)
+    pr = next((x for x in ls if "практика" in x["s"].lower()), None)
+    if not (t and pr): return ls
+    m = {"s": pr["s"], "t": t["t"], "r": t["r"], "p": t["p"], "e": t["p"] + 2}
+    rest = [x for x in ls if x is not t and x is not pr]
+    return sorted(rest + [m], key=lambda x: x["p"])
 def parse(path, year):
     out, week = {}, None
     with pdfplumber.open(path) as pdf:
@@ -36,7 +44,7 @@ def parse(path, year):
                     c = cell(pg.crop((x0+1, y0+1, x1-1, y1-1)))
                     if c:
                         c["p"] = i % 5 + 1; days.setdefault(DAYS[i//5], []).append(c)
-                if g: out[g] = days
+                if g: out[g] = {d: merge_practice(v) for d, v in days.items()}
     return week, out
 if __name__ == "__main__":
     src, dst = sys.argv[1], sys.argv[2]
